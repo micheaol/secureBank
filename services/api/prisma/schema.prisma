@@ -1,0 +1,275 @@
+// SecureBank data model (SB-004)
+// Single Prisma schema shared by all backend modules; each module's model.js
+// exposes only the data-access functions relevant to its own domain.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access (owned by the "users" and "auth" modules)
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  fullName           String
+  email              String    @unique
+  passwordHash       String
+  phoneNumber        String?
+  role               Role      @relation(fields: [roleId], references: [id])
+  roleId             String
+  isActive           Boolean   @default(true)
+  isTwoFactorEnabled Boolean   @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  accounts            Account[]
+  beneficiaries       Beneficiary[]
+  supportTickets      SupportTicket[]
+  supportMessages     SupportMessage[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  auditEvents         AuditEvent[]         @relation("AuditEventActor")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Core banking (owned by the "accounts", "beneficiaries", "transactions" and
+// "transfers" modules)
+// ---------------------------------------------------------------------------
+
+enum AccountType {
+  CURRENT
+  SAVINGS
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+model Account {
+  id               String        @id @default(uuid())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  accountNumber    String        @unique
+  accountType      AccountType
+  status           AccountStatus @default(ACTIVE)
+  currency         String        @default("NGN")
+  balance          Decimal       @default(0) @db.Decimal(18, 2)
+  availableBalance Decimal       @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  transactions      Transaction[]
+  outgoingTransfers Transfer[]    @relation("TransferSourceAccount")
+  incomingTransfers Transfer[]    @relation("TransferDestinationAccount")
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Beneficiary {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  nickname      String?
+  accountName   String
+  accountNumber String
+  bankName      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transfers Transfer[]
+
+  @@index([userId])
+  @@map("beneficiaries")
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+}
+
+enum TransactionStatus {
+  SUCCESSFUL
+  PENDING
+  REVERSED
+  FAILED
+}
+
+model Transaction {
+  id           String             @id @default(uuid())
+  account      Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId    String
+  reference    String             @unique
+  type         TransactionType
+  status       TransactionStatus  @default(PENDING)
+  amount       Decimal            @db.Decimal(18, 2)
+  balanceAfter Decimal            @db.Decimal(18, 2)
+  description  String
+  category     String?
+  channel      String             @default("SecureBank Online")
+  occurredAt   DateTime           @default(now())
+  createdAt    DateTime           @default(now())
+
+  transfer Transfer?
+
+  @@index([accountId])
+  @@map("transactions")
+}
+
+enum TransferStatus {
+  PROCESSING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+  PENDING
+}
+
+model Transfer {
+  id                   String         @id @default(uuid())
+  reference            String         @unique
+  sourceAccount        Account        @relation("TransferSourceAccount", fields: [sourceAccountId], references: [id])
+  sourceAccountId      String
+  destinationAccount   Account?       @relation("TransferDestinationAccount", fields: [destinationAccountId], references: [id])
+  destinationAccountId String?
+  beneficiary          Beneficiary?   @relation(fields: [beneficiaryId], references: [id])
+  beneficiaryId        String?
+  amount               Decimal        @db.Decimal(18, 2)
+  fee                  Decimal        @default(0) @db.Decimal(18, 2)
+  description          String?
+  status               TransferStatus @default(PROCESSING)
+  transaction          Transaction?   @relation(fields: [transactionId], references: [id])
+  transactionId        String?        @unique
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  @@index([sourceAccountId])
+  @@map("transfers")
+}
+
+// ---------------------------------------------------------------------------
+// Support (owned by the "support" module)
+// ---------------------------------------------------------------------------
+
+enum SupportTicketStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id        String                @id @default(uuid())
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  subject   String
+  category  String
+  status    SupportTicketStatus   @default(OPEN)
+  priority  SupportTicketPriority @default(MEDIUM)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId  String
+  sender    User          @relation(fields: [senderId], references: [id])
+  senderId  String
+  message   String
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId])
+  @@map("support_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Observability (owned by the "audit" module)
+// ---------------------------------------------------------------------------
+
+enum AuditEventResult {
+  SUCCESS
+  DENIED
+  ERROR
+}
+
+model AuditEvent {
+  id            String           @id @default(uuid())
+  actor         User?            @relation("AuditEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId       String?
+  actorRole     String?
+  action        String
+  resourceType  String?
+  resourceId    String?
+  result        AuditEventResult
+  ipAddress     String?
+  userAgent     String?
+  correlationId String?
+  metadata      Json?
+  createdAt     DateTime         @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_events")
+}

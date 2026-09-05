@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: securebank
+      POSTGRES_PASSWORD: securebank
+      POSTGRES_DB: securebank_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - securebank_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securebank -d securebank_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      WEB_APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://securebank:securebank@db:5432/securebank_dev
+      JWT_ACCESS_SECRET: dev-only-access-secret-change-me
+      JWT_REFRESH_SECRET: dev-only-refresh-secret-change-me
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN_DAYS: 7
+      PASSWORD_RESET_EXPIRES_IN_MINUTES: 30
+      BCRYPT_SALT_ROUNDS: 12
+    ports:
+      - "4000:4000"
+    volumes:
+      - .:/usr/src/app
+      - securebank_api_node_modules:/usr/src/app/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:4000/api/v1
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/src/app
+      - securebank_web_node_modules:/usr/src/app/node_modules
+
+volumes:
+  securebank_postgres_data:
+  securebank_api_node_modules:
+  securebank_web_node_modules:
