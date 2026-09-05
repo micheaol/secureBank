@@ -8,12 +8,12 @@ import { cx } from "../ui/cx";
 
 const BANK_NAV_ITEMS = [
   { label: "Dashboard", href: "/bank/dashboard", builtInThisSprint: true },
-  { label: "Transfers", href: null, builtInThisSprint: false },
-  { label: "Transactions", href: null, builtInThisSprint: false },
+  { label: "Transfers", href: "/bank/transfers", builtInThisSprint: true },
+  { label: "Transactions", href: "/bank/transactions", builtInThisSprint: true },
   { label: "SecureBank AI", href: null, builtInThisSprint: false },
   { label: "Accounts", href: null, builtInThisSprint: false },
-  { label: "Beneficiaries", href: null, builtInThisSprint: false },
-  { label: "Support", href: null, builtInThisSprint: false },
+  { label: "Beneficiaries", href: "/bank/beneficiaries", builtInThisSprint: true },
+  { label: "Support", href: "/bank/support", builtInThisSprint: true },
 ];
 
 function buildInitialsFromFullName(fullName) {
@@ -71,7 +71,7 @@ export function BankTopNav() {
 
       {currentUser?.user ? (
         <div className="flex items-center gap-2">
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-accent-200 font-mono text-[12px] text-accent-800">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-200 font-mono text-[12px] text-accent-800">
             {buildInitialsFromFullName(currentUser.user.fullName)}
           </span>
           <span className="text-[15px]">{currentUser.user.fullName}</span>

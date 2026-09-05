@@ -35,3 +35,5 @@ services/api/*.sqlite
 dist/
 build/
 design_handoff_securebank/
+10-Week-plan.md
+PRD.md

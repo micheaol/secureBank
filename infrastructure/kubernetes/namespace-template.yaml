@@ -1,0 +1,45 @@
+# Illustrative template - not applied. Render with participant/team id
+# substituted for ${PARTICIPANT_ID} by the environment orchestrator (SB-067)
+# before `kubectl apply -f`.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sb-participant-${PARTICIPANT_ID}
+  labels:
+    securebank.io/managed-by: environment-orchestrator
+    securebank.io/participant-id: "${PARTICIPANT_ID}"
+---
+# SB-070: hard ceiling on total resources this participant's namespace can
+# consume, so one runaway workload cannot degrade the conference floor for
+# everyone else.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sb-participant-quota
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.storage: 2Gi
+    pods: "10"
+---
+# SB-070: per-container defaults, so a single pod manifest that omits limits
+# still can't consume the whole namespace quota by itself.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sb-participant-limit-range
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi

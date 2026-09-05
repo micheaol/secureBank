@@ -25,5 +25,5 @@ export function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/bank/:path*"],
+  matcher: ["/bank/:path*", "/sandbox/:path*", "/facilitator/:path*", "/admin/:path*", "/conference/:path*"],
 };

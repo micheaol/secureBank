@@ -47,6 +47,12 @@ model User {
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   auditEvents         AuditEvent[]         @relation("AuditEventActor")
+  challengeProgress   ChallengeProgress[]
+  environments        Environment[]
+  teamMembership      TeamMembership?
+  achievements        UserAchievement[]
+  scoreEvents         ScoreEvent[]
+  helpRequests        HelpRequest[]
 
   @@map("users")
 }
@@ -189,6 +195,9 @@ model Transfer {
   status               TransferStatus @default(PROCESSING)
   transaction          Transaction?   @relation(fields: [transactionId], references: [id])
   transactionId        String?        @unique
+  otpTokenHash         String?
+  otpExpiresAt         DateTime?
+  otpAttempts          Int            @default(0)
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
@@ -272,4 +281,244 @@ model AuditEvent {
   @@index([actorId])
   @@index([createdAt])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Challenge framework (owned by the "challenges" module) - SB-012
+// ---------------------------------------------------------------------------
+
+enum ChallengeDifficulty {
+  EXPLORER
+  ENGINEER
+  SPECIALIST
+}
+
+// Per-participant progress on a challenge. LOCKED/AVAILABLE/ACTIVE/SOLVED
+// drives the UI; flagState is the SB-013 feature flag that lets a
+// participant's own environment be independently vulnerable, patched or
+// reset without touching anyone else's.
+enum ChallengeStatus {
+  LOCKED
+  AVAILABLE
+  ACTIVE
+  SOLVED
+}
+
+enum ChallengeFlagState {
+  VULNERABLE
+  PATCHED
+}
+
+model Lab {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  challenges   Challenge[]
+  environments Environment[]
+  helpRequests HelpRequest[]
+
+  @@map("labs")
+}
+
+model Challenge {
+  id                       String              @id @default(uuid())
+  lab                      Lab                 @relation(fields: [labId], references: [id])
+  labId                    String
+  code                     String              @unique
+  title                    String
+  difficulty               ChallengeDifficulty
+  order                    Int                 @default(0)
+  scenario                 String
+  objective                String
+  learningObjective        String
+  prerequisites            String?
+  startingState            String?
+  expectedSecurityBoundary String?
+  intendedWeakness         String
+  validationType           String              @default("automated")
+  answerKey                String?
+  evidenceBundle           Json?
+  remediationDiff          Json?
+  points                   Int
+  remediationPoints        Int?
+  isHidden                 Boolean             @default(false)
+  remediationGuide         String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  hints    ChallengeHint[]
+  progress ChallengeProgress[]
+
+  @@index([labId])
+  @@map("challenges")
+}
+
+model ChallengeHint {
+  id          String    @id @default(uuid())
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId String
+  order       Int
+  cost        Int
+  content     String
+
+  @@index([challengeId])
+  @@map("challenge_hints")
+}
+
+model ChallengeProgress {
+  id              String             @id @default(uuid())
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  challenge       Challenge          @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challengeId     String
+  status          ChallengeStatus    @default(LOCKED)
+  flagState       ChallengeFlagState @default(VULNERABLE)
+  hintsRevealed   Int                @default(0)
+  pointsAwarded   Int                @default(0)
+  evidence        Json?
+  submittedAnswer String?
+  attempts        Int                @default(0)
+  solvedAt        DateTime?
+  remediatedAt    DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([userId, challengeId])
+  @@index([challengeId])
+  @@map("challenge_progress")
+}
+
+// ---------------------------------------------------------------------------
+// Lab environments (owned by the "environments" module)
+// ---------------------------------------------------------------------------
+
+enum EnvironmentStatus {
+  PROVISIONING
+  RUNNING
+  EXPIRED
+  TERMINATED
+  UNHEALTHY
+}
+
+model Environment {
+  id         String            @id @default(uuid())
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  lab        Lab               @relation(fields: [labId], references: [id])
+  labId      String
+  externalId String            @unique
+  status     EnvironmentStatus @default(PROVISIONING)
+  expiresAt  DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([userId])
+  @@map("environments")
+}
+
+// ---------------------------------------------------------------------------
+// Gamification (owned by the "gamification" module) - SB-057..065
+// ---------------------------------------------------------------------------
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  memberships TeamMembership[]
+
+  @@map("teams")
+}
+
+model TeamMembership {
+  id       String   @id @default(uuid())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String   @unique
+  joinedAt DateTime @default(now())
+
+  @@index([teamId])
+  @@map("team_memberships")
+}
+
+model Achievement {
+  id          String @id @default(uuid())
+  code        String @unique
+  name        String
+  description String
+  icon        String?
+
+  unlocks UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+model ScoreEvent {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  points      Int
+  reason      String
+  challengeId String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("score_events")
+}
+
+// ---------------------------------------------------------------------------
+// Facilitator help queue (owned by the "helpRequests" module) - SB-064
+// ---------------------------------------------------------------------------
+
+enum HelpRequestStatus {
+  OPEN
+  RESOLVED
+}
+
+model HelpRequest {
+  id         String            @id @default(uuid())
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  lab        Lab?              @relation(fields: [labId], references: [id])
+  labId      String?
+  reason     String
+  status     HelpRequestStatus @default(OPEN)
+  createdAt  DateTime          @default(now())
+  resolvedAt DateTime?
+
+  @@index([status])
+  @@map("help_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Operational feature flags (owned by the "systemFlags" module) - SB-072
+// Sandbox-wide emergency controls: stop provisioning, disable a lab, etc.
+// ---------------------------------------------------------------------------
+
+model SystemFlag {
+  key       String   @id
+  value     Boolean  @default(false)
+  reason    String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@map("system_flags")
 }
