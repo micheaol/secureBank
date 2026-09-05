@@ -1,28 +1,77 @@
 const prismaClient = require("../../config/prismaClient");
 
-// Full transfer workflow (recipient -> amount -> review -> authorize -> success)
-// is a Week 2 deliverable (SB-009). This module currently exposes only the
-// data-access functions the data model requires.
-
-async function createTransfer({ reference, sourceAccountId, destinationAccountId, beneficiaryId, amount, fee, description, status, transactionId }) {
-  return prismaClient.transfer.create({
-    data: { reference, sourceAccountId, destinationAccountId, beneficiaryId, amount, fee, description, status, transactionId },
+async function createPendingTransfer(
+  {
+    reference,
+    sourceAccountId,
+    destinationAccountId,
+    beneficiaryId,
+    amount,
+    fee,
+    description,
+    otpTokenHash,
+    otpExpiresAt,
+  },
+  client = prismaClient
+) {
+  return client.transfer.create({
+    data: {
+      reference,
+      sourceAccountId,
+      destinationAccountId,
+      beneficiaryId,
+      amount,
+      fee,
+      description,
+      status: "PENDING",
+      otpTokenHash,
+      otpExpiresAt,
+    },
+    include: { destinationAccount: true, beneficiary: true, sourceAccount: true },
   });
 }
 
-async function findTransfersBySourceAccountId(sourceAccountId) {
+async function findTransferByIdForUser(transferId, userId) {
+  return prismaClient.transfer.findFirst({
+    where: { id: transferId, sourceAccount: { userId } },
+    include: { destinationAccount: true, beneficiary: true, sourceAccount: true },
+  });
+}
+
+async function incrementOtpAttempts(transferId, client = prismaClient) {
+  return client.transfer.update({
+    where: { id: transferId },
+    data: { otpAttempts: { increment: 1 } },
+  });
+}
+
+async function markTransferSuccessful(transferId, transactionId, client = prismaClient) {
+  return client.transfer.update({
+    where: { id: transferId },
+    data: { status: "SUCCESSFUL", transactionId, otpTokenHash: null },
+  });
+}
+
+async function markTransferFailed(transferId, client = prismaClient) {
+  return client.transfer.update({
+    where: { id: transferId },
+    data: { status: "FAILED", otpTokenHash: null },
+  });
+}
+
+async function findTransfersBySourceAccountIds(sourceAccountIds) {
   return prismaClient.transfer.findMany({
-    where: { sourceAccountId },
+    where: { sourceAccountId: { in: sourceAccountIds } },
+    include: { destinationAccount: true, beneficiary: true },
     orderBy: { createdAt: "desc" },
   });
 }
 
-async function findTransferByReference(reference) {
-  return prismaClient.transfer.findUnique({ where: { reference } });
-}
-
 module.exports = {
-  createTransfer,
-  findTransfersBySourceAccountId,
-  findTransferByReference,
+  createPendingTransfer,
+  findTransferByIdForUser,
+  incrementOtpAttempts,
+  markTransferSuccessful,
+  markTransferFailed,
+  findTransfersBySourceAccountIds,
 };

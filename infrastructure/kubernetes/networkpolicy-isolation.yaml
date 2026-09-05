@@ -1,0 +1,68 @@
+# Illustrative template - not applied. SB-068 (participant isolation) and
+# SB-069 (egress controls): default-deny everything, then explicitly allow
+# only what a lab environment legitimately needs.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  # No rules = deny everything not explicitly allowed below.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-control-plane
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              securebank.io/role: control-plane
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              securebank.io/role: control-plane
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  # Web -> API -> Postgres within the SAME participant's namespace only.
+  # Nothing here permits traffic to another participant's namespace or to
+  # the public internet (PRD §4 "Isolated": no bridge to attack external
+  # infrastructure).
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

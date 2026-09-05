@@ -28,6 +28,19 @@ async function baseQueryWithReauthentication(args, apiContext, extraOptions) {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauthentication,
-  tagTypes: ["CurrentUser", "Account"],
+  tagTypes: [
+    "CurrentUser",
+    "Account",
+    "Beneficiary",
+    "Transaction",
+    "Transfer",
+    "SupportTicket",
+    "Lab",
+    "Challenge",
+    "Score",
+    "HelpRequest",
+    "AdminEnvironment",
+    "AdminEmergency",
+  ],
   endpoints: () => ({}),
 });

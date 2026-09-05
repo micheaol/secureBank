@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const { seedLabChallenges } = require("./seeds/labChallenges");
 
 const prismaClient = new PrismaClient();
 
@@ -123,12 +124,55 @@ async function seedDemoAdministrator(administratorRoleId) {
   });
 }
 
+const LAB_DEFINITIONS = [
+  { code: "WEB", name: "Web Application Security", description: "Authentication, authorization, session and input-handling weaknesses in the customer and admin applications.", order: 1 },
+  { code: "API", name: "API Security", description: "Broken object/function level authorization, mass assignment and business-flow abuse across SecureBank's APIs.", order: 2 },
+  { code: "AI", name: "AI Security", description: "Prompt injection, excessive agency and authorization failures around the SecureBank AI assistant.", order: 3 },
+  { code: "DEVSECOPS", name: "DevSecOps", description: "Secrets, pipeline permissions, container and IaC weaknesses in SecureBank's delivery pipeline.", order: 4 },
+  { code: "SUPPLY_CHAIN", name: "Software Supply Chain", description: "Dependency, build and artifact-integrity investigation from source to deployed release.", order: 5 },
+];
+
+const ACHIEVEMENT_DEFINITIONS = [
+  { code: "first_blood", name: "First Blood", description: "Solved your first challenge.", icon: "🩸" },
+  { code: "access_controller", name: "Access Controller", description: "Solved every Web Application Security access-control challenge.", icon: "🔐" },
+  { code: "api_hunter", name: "API Hunter", description: "Solved every API Security challenge.", icon: "🔌" },
+  { code: "secure_coder", name: "Secure Coder", description: "Successfully remediated a Web Application Security finding.", icon: "🧑‍💻" },
+  { code: "pipeline_defender", name: "Pipeline Defender", description: "Solved every DevSecOps challenge.", icon: "♾️" },
+  { code: "ai_red_teamer", name: "AI Red Teamer", description: "Solved every AI Security challenge.", icon: "🤖" },
+  { code: "supply_chain_investigator", name: "Supply Chain Investigator", description: "Solved every Software Supply Chain challenge.", icon: "📦" },
+  { code: "remediation_master", name: "Remediation Master", description: "Remediated five findings across any labs.", icon: "🛠️" },
+  { code: "securebank_defender", name: "SecureBank Defender", description: "Solved at least one challenge in every lab.", icon: "🛡️" },
+];
+
+async function seedLabs() {
+  for (const labDefinition of LAB_DEFINITIONS) {
+    await prismaClient.lab.upsert({
+      where: { code: labDefinition.code },
+      update: {},
+      create: labDefinition,
+    });
+  }
+}
+
+async function seedAchievements() {
+  for (const achievementDefinition of ACHIEVEMENT_DEFINITIONS) {
+    await prismaClient.achievement.upsert({
+      where: { code: achievementDefinition.code },
+      update: {},
+      create: achievementDefinition,
+    });
+  }
+}
+
 async function runDatabaseSeed() {
   console.info("Seeding SecureBank synthetic data...");
 
   const rolesByName = await seedRoles();
   await seedDemoCustomer(rolesByName.customer.id);
   await seedDemoAdministrator(rolesByName.administrator.id);
+  await seedLabs();
+  await seedAchievements();
+  await seedLabChallenges(prismaClient);
 
   console.info("Seed complete. Demo login: ada.okafor@securebank.training /", DEMO_PASSWORD);
 }

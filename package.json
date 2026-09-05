@@ -13,7 +13,13 @@
     "db:migrate": "npm run db:migrate --workspace=services/api",
     "db:seed": "npm run db:seed --workspace=services/api",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "test:load": "node infrastructure/load-tests/run-load-test.js",
+    "test:isolation": "node infrastructure/load-tests/isolation-test.js",
+    "test:challenges": "node infrastructure/load-tests/challenge-qa.js"
+  },
+  "devDependencies": {
+    "autocannon": "^7.15.0"
   },
   "engines": {
     "node": ">=20.0.0"

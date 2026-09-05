@@ -1,0 +1,49 @@
+# Illustrative template - not applied. One participant's copy of the
+# banking application, deployed into their isolated namespace by the
+# environment orchestrator (SB-067) when a lab is launched.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securebank-api
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: securebank-api
+  template:
+    metadata:
+      labels:
+        app: securebank-api
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: api
+          image: securebank/api:${IMAGE_TAG}
+          ports:
+            - containerPort: 4000
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+          envFrom:
+            - secretRef:
+                name: securebank-api-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: securebank-api
+  namespace: sb-participant-${PARTICIPANT_ID}
+spec:
+  selector:
+    app: securebank-api
+  ports:
+    - port: 4000
+      targetPort: 4000

@@ -3,10 +3,10 @@ import { cx } from "../ui/cx";
 
 const SURFACE_TABS = [
   { id: "bank", label: "Digital Bank", href: "/bank/dashboard" },
-  { id: "sandbox", label: "Sandbox", href: null },
-  { id: "facilitator", label: "Facilitator", href: null },
-  { id: "admin", label: "Admin", href: null },
-  { id: "conference", label: "Conference", href: null },
+  { id: "sandbox", label: "Sandbox", href: "/sandbox/dashboard" },
+  { id: "facilitator", label: "Facilitator", href: "/facilitator" },
+  { id: "admin", label: "Admin", href: "/admin" },
+  { id: "conference", label: "Conference", href: "/conference" },
 ];
 
 export function Masthead({ activeSurface = "bank" }) {

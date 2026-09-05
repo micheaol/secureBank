@@ -22,9 +22,15 @@ function hashOpaqueToken(rawToken) {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 
+function generateNumericOneTimePasscode(digitCount = 6) {
+  const code = Array.from({ length: digitCount }, () => crypto.randomInt(0, 10)).join("");
+  return { code, codeHash: hashOpaqueToken(code) };
+}
+
 module.exports = {
   signAccessToken,
   verifyAccessToken,
   generateOpaqueSessionToken,
   hashOpaqueToken,
+  generateNumericOneTimePasscode,
 };
