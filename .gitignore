@@ -27,13 +27,28 @@ logs/
 
 # Testing
 coverage/
+.eslintcache
 
 # Database
 services/api/*.sqlite
+services/api/*.sqlite3
+
+# Secrets and credentials - never commit real values, only *.example files
+*.pem
+*.key
+*.crt
+*.p12
+*credentials*.json
 
 # Build output
 dist/
 build/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
 design_handoff_securebank/
 10-Week-plan.md
 PRD.md
+docs/go-no-go-checklist.md
+docs/load-testing.md
